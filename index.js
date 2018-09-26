@@ -1,6 +1,6 @@
 /*eslint-env es6 */
 const canvas = require('canvas-api-wrapper');
-const d3 = require('d3-dsv')
+const d3 = require('d3-dsv');
 const fs = require('fs');
 const path = require('path');
 const chalk = require('chalk');
@@ -15,8 +15,7 @@ async function getCanvasItems(course, userInput) {
 let counter = 0;
 async function fixCanvasItems(course, canvasItems, userInput) {
     console.log(`Fixing ${userInput.category}`);
-    fs.writeFileSync(`./theThingWeNeed_${counter}.json`, JSON.stringify(canvasItems, null, 4));//***********************************************
-    counter++;
+    // fs.writeFileSync(`./theThingWeNeed_${counter++}.json`, JSON.stringify(canvasItems, null, 4));//***********************************************
     // find the old url
     let found = canvasItems.filter(canvasItem => {
         let objValues = Object.values(canvasItem);
@@ -26,15 +25,15 @@ async function fixCanvasItems(course, canvasItems, userInput) {
         var urlExists = objValues.some((objValue) => {
             if (typeof objValue === 'object') {
                 try {
-                    return userInput.locateUrl.includes(objValue.url)
+                    return userInput.locateUrl.includes(objValue.url);
                 } catch (e) {
-                    return false
+                    return false;
                 }
-                return false
+                return false;
             }
 
         });
-        return urlExists
+        return urlExists;
     });
 
     // console.log(`found: ${found}`);
@@ -65,7 +64,7 @@ async function fixCanvasItems(course, canvasItems, userInput) {
         }
 
         // return the log for the csv
-        console.log('I AM READY TO RETURN. BEAM ME UP SCOTTY')
+        console.log('I AM READY TO RETURN. BEAM ME UP SCOTTY!');
         return Promise.resolve({
             'Course Name': course.name,
             'Course ID': course.id,
@@ -73,7 +72,7 @@ async function fixCanvasItems(course, canvasItems, userInput) {
             'Link Searched For': userInput.locateUrl,
             'Found': foundItem,
             'Messages': JSON.stringify(messages)
-        })
+        });
     });
 
     return Promise.all(canvasItemLogs);
@@ -98,7 +97,7 @@ async function getAllCourses(userInput) {
     // although we got everything under the specified account, not
     // everything necessarily belongs to it since there are nested subaccounts
     if (userInput.includeNestedAccounts === true) {
-        courses = courses.filter(course => course.account_id === userInput.subaccount)
+        courses = courses.filter(course => course.account_id === userInput.subaccount);
     }
     return courses;
 }
@@ -111,8 +110,9 @@ async function main(userInput) {
     for (let i = 0; i < courses.length; i++) {
         let canvasItems = await getCanvasItems(courses[i], userInput);
         // var logItem;
-        await fixCanvasItems(courses[i], canvasItems, userInput).then((itemsToLog) => { logs.concat(itemsToLog) });
-        console.log('I\'m BEAMING YOU UP SCOTTY');
+        await fixCanvasItems(courses[i], canvasItems, userInput).then((itemsToLog) => { logs.push(...itemsToLog); });
+        console.log('I\'m BEAMING YOU UP CAPTAIN!');
+        // console.log(logs);
         // logs = logs.concat(logItem);
     }
     console.log('LOGS: ', logs);
@@ -120,12 +120,12 @@ async function main(userInput) {
     console.log('Formating csv');
     /* Format and create the CSV file with the log data */
     const csvData = d3.csvFormat(logs, [
-        "Course Name",
-        "Course ID",
-        "Item Title",
-        "Link Searched For",
-        "Found",
-        "Messages"
+        'Course Name',
+        'Course ID',
+        'Item Title',
+        'Link Searched For',
+        'Found',
+        'Messages'
     ]);
     console.log(csvData);
 
@@ -141,4 +141,4 @@ async function main(userInput) {
 
 module.exports = {
     main
-}
+};
