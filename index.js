@@ -1,31 +1,47 @@
+/*eslint-env es6 */
 const canvas = require('canvas-api-wrapper');
 const d3 = require('d3-dsv')
 const fs = require('fs');
 const path = require('path');
+const chalk = require('chalk');
 
 async function getCanvasItems(course, userInput) {
-    let canvasItems = await canvas.get(`/api/v1/courses/${course.id}/${userInput.category}`, {
-        'include[]': 'external_tool_tag_attributes'
-    });
+    let canvasItems = await canvas.get(`/api/v1/courses/${course.id}/${userInput.category}`);
     console.log(`Got ${userInput.category} for ${course.name}`);
+    // console.log('Canvas Items: ', Object.values(canvasItems.join(' ')));
     return canvasItems;
 }
+
+let counter = 0;
 async function fixCanvasItems(course, canvasItems, userInput) {
     console.log(`Fixing ${userInput.category}`);
-
+    fs.writeFileSync(`./theThingWeNeed_${counter}.json`, JSON.stringify(canvasItems, null, 4));//***********************************************
+    counter++;
     // find the old url
     let found = canvasItems.filter(canvasItem => {
         let objValues = Object.values(canvasItem);
+        console.log(objValues);
         let objString = objValues.join(' ');
-        console.log(objString);
-        return objString.includes(userInput.locateUrl);
+        console.log(chalk.blue(objString));
+        var urlExists = objValues.some((objValue) => {
+            if (typeof objValue === 'object') {
+                try {
+                    return userInput.locateUrl.includes(objValue.url)
+                } catch (e) {
+                    return false
+                }
+                return false
+            }
+
+        });
+        return urlExists
     });
 
-    console.log(`found: ${found}`);
+    // console.log(`found: ${found}`);
+    console.log('Found length: ', found.length);
     if (found.length === 0) {
         return;
     }
-
 
     // catch the errors
     let messages = [];
@@ -35,7 +51,7 @@ async function fixCanvasItems(course, canvasItems, userInput) {
     }
 
     // get the logs for the csv
-    let canvasItemLogs = found.map(foundItem => {
+    let canvasItemLogs = found.map(async foundItem => {
         // determine the title based on the canvasItem type
         let title = '';
         if (foundItem.title !== undefined) {
@@ -49,17 +65,18 @@ async function fixCanvasItems(course, canvasItems, userInput) {
         }
 
         // return the log for the csv
-        return {
+        console.log('I AM READY TO RETURN. BEAM ME UP SCOTTY')
+        return Promise.resolve({
             'Course Name': course.name,
             'Course ID': course.id,
             'Item Title': title,
             'Link Searched For': userInput.locateUrl,
             'Found': foundItem,
             'Messages': JSON.stringify(messages)
-        }
+        })
     });
 
-    return canvasItemLogs;
+    return Promise.all(canvasItemLogs);
 }
 
 async function getAllCourses(userInput) {
@@ -69,6 +86,7 @@ async function getAllCourses(userInput) {
         'include[]': 'subaccount',
         search_term: 'seth childers'
     });
+    // fs.writeFileSync('./theThingWeNeed.json', JSON.stringify(courses, null, 4));******************************************************************************
 
     // sort them alphabetically so I know where in the list the tool is at when running
     courses.sort((a, b) => {
@@ -92,10 +110,13 @@ async function main(userInput) {
     let logs = [];
     for (let i = 0; i < courses.length; i++) {
         let canvasItems = await getCanvasItems(courses[i], userInput);
-        let logItem = await fixCanvasItems(courses[i], canvasItems, userInput);
-        logs = logs.concat(logItem);
-
+        // var logItem;
+        await fixCanvasItems(courses[i], canvasItems, userInput).then((itemsToLog) => { logs.concat(itemsToLog) });
+        console.log('I\'m BEAMING YOU UP SCOTTY');
+        // logs = logs.concat(logItem);
     }
+    console.log('LOGS: ', logs);
+
     console.log('Formating csv');
     /* Format and create the CSV file with the log data */
     const csvData = d3.csvFormat(logs, [
