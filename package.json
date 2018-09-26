@@ -1,0 +1,17 @@
+{
+  "name": "canvas-quiz-getter",
+  "version": "1.0.0",
+  "description": "Get canvas quizzes",
+  "main": "cli.js",
+  "scripts": {
+    "test": "test",
+    "start": "node cli.js"
+  },
+  "author": "Seth Childers and Benjamin Earl",
+  "license": "MIT",
+  "dependencies": {
+    "canvas-api-wrapper": "^3.3.3",
+    "d3-dsv": "^1.0.10",
+    "fs": "0.0.1-security"
+  }
+}
