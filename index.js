@@ -110,7 +110,7 @@ async function main(userInput) {
     for (let i = 0; i < courses.length; i++) {
         let canvasItems = await getCanvasItems(courses[i], userInput);
         // var logItem;
-        await fixCanvasItems(courses[i], canvasItems, userInput).then((itemsToLog) => { logs.push(...itemsToLog); });
+        await fixCanvasItems(courses[i], canvasItems, userInput).then((itemsToLog) => { logs.push(...itemsToLog); }); // changed to push rather than concat. solved some problems but might need some tweaking on larger datasets
         console.log('I\'m BEAMING YOU UP CAPTAIN!');
         // console.log(logs);
         // logs = logs.concat(logItem);
