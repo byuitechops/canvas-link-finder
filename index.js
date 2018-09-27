@@ -1,5 +1,6 @@
 /*eslint-env es6 */
 const canvas = require('canvas-api-wrapper');
+// canvas.oncall = e => console.log(e.method, e.url);
 const d3 = require('d3-dsv');
 const fs = require('fs');
 const path = require('path');
@@ -19,16 +20,14 @@ async function fixCanvasItems(course, canvasItems, userInput) {
     // find the old url
     let found = canvasItems.filter(canvasItem => {
         let objValues = Object.values(canvasItem);
-        console.log(objValues);
+        // console.log(objValues);
         let objString = objValues.join(' ');
-        console.log(chalk.blue(objString));
-        var urlExists = objValues.some((objValue) => {
+        // console.log(chalk.blue(objString));
+        var urlExists = objValues.find((objValue) => {
+            // console.log(objValue);
             if (typeof objValue === 'object') {
-                try {
-                    return userInput.locateUrl.includes(objValue.url);
-                } catch (e) {
-                    return false;
-                }
+                try {return userInput.locateUrl.includes(objValue.url);}
+                catch (e) {return false;}
                 return false;
             }
 
@@ -39,6 +38,7 @@ async function fixCanvasItems(course, canvasItems, userInput) {
     // console.log(`found: ${found}`);
     console.log('Found length: ', found.length);
     if (found.length === 0) {
+        console.log('No matches found. Moving to the next course...\n');
         return;
     }
 
@@ -66,11 +66,12 @@ async function fixCanvasItems(course, canvasItems, userInput) {
         // return the log for the csv
         console.log('I AM READY TO RETURN. BEAM ME UP SCOTTY!');
         return Promise.resolve({
+            'Term': course.term.name,
             'Course Name': course.name,
             'Course ID': course.id,
+            'Type': userInput.category,
             'Item Title': title,
             'Link Searched For': userInput.locateUrl,
-            'Found': foundItem,
             'Messages': JSON.stringify(messages)
         });
     });
@@ -80,24 +81,31 @@ async function fixCanvasItems(course, canvasItems, userInput) {
 
 async function getAllCourses(userInput) {
     // get all courses from the Master Courses subaccount (i.e. 42)
-    let courses = await canvas.get(`/api/v1/accounts/${userInput.subaccount}/courses`, {
+    let courses = await canvas.get(`/api/v1/accounts/${userInput.subaccount}/courses?include[]=subaccount&include[]=term`, {
         sort: 'course_name',
-        'include[]': 'subaccount',
-        search_term: 'seth childers'
+        'include': [
+            'subaccount',
+            'term'
+        ],
+        // search_term: 'seth childers'
     });
-    // fs.writeFileSync('./theThingWeNeed.json', JSON.stringify(courses, null, 4));******************************************************************************
-
+    
     // sort them alphabetically so I know where in the list the tool is at when running
     courses.sort((a, b) => {
         if (a.course_code > b.course_code) return 1;
         else if (a.course_code < b.course_code) return -1;
         else return 0;
     });
-
+    
     // although we got everything under the specified account, not
     // everything necessarily belongs to it since there are nested subaccounts
     if (userInput.includeNestedAccounts === true) {
         courses = courses.filter(course => course.account_id === userInput.subaccount);
+    }
+    // if the user specified a specific term, filter through and only include those in that term
+    if (userInput.term !== 'All Terms') {
+        // fs.writeFileSync('./theThingWeNeed.json', JSON.stringify(courses, null, 4)); // ******************************************************************************
+        courses = courses.filter(course => course.term.name.includes(userInput.term));
     }
     return courses;
 }
@@ -105,26 +113,31 @@ async function getAllCourses(userInput) {
 async function main(userInput) {
     // get all the courses
     let courses = await getAllCourses(userInput);
+    console.log(`\nYou are about to process/check ${courses.length} courses!\n`);
     // get the assignments for each course
     let logs = [];
     for (let i = 0; i < courses.length; i++) {
-        let canvasItems = await getCanvasItems(courses[i], userInput);
-        // var logItem;
-        await fixCanvasItems(courses[i], canvasItems, userInput).then((itemsToLog) => { logs.push(...itemsToLog); }); // changed to push rather than concat. solved some problems but might need some tweaking on larger datasets
-        console.log('I\'m BEAMING YOU UP CAPTAIN!');
-        // console.log(logs);
-        // logs = logs.concat(logItem);
+        try {
+            let canvasItems = await getCanvasItems(courses[i], userInput);
+            if (canvasItems && canvasItems.length !== 0) {
+                await fixCanvasItems(courses[i], canvasItems, userInput)
+                    .then((itemsToLog) => { if (itemsToLog && itemsToLog.length !== 0) logs.push(...itemsToLog); }); // changed to push rather than concat. solved some problems but might need some tweaking on larger datasets
+            }
+        } catch (err) {
+            console.error(err);
+        }
     }
     console.log('LOGS: ', logs);
 
     console.log('Formating csv');
     /* Format and create the CSV file with the log data */
     const csvData = d3.csvFormat(logs, [
+        'Term',
         'Course Name',
         'Course ID',
+        'Type',
         'Item Title',
         'Link Searched For',
-        'Found',
         'Messages'
     ]);
     console.log(csvData);
