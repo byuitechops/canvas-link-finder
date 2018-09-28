@@ -7,7 +7,7 @@
     "test": "test",
     "start": "node cli.js"
   },
-  "author": "Seth Childers and Benjamin Earl",
+  "author": "Seth Childers and Benjamin Earl and Aaron Shiffler",
   "license": "MIT",
   "dependencies": {
     "canvas-api-wrapper": "^3.3.3",

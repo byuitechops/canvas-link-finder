@@ -1,102 +1,99 @@
-/*eslint-env es6 */
+/*eslint-env es6*/
 const canvas = require('canvas-api-wrapper');
-// canvas.oncall = e => console.log(e.method, e.url);
 const d3 = require('d3-dsv');
 const fs = require('fs');
 const path = require('path');
 const chalk = require('chalk');
 
+
+/*************************************************************************
+ * makes a get request to canvas to get all of the data in the given topic
+ * for the given course
+ * @param {object} course the specific course object to look at
+ * @param {object} userInput the userInput object that has the wanted category
+ *************************************************************************/
 async function getCanvasItems(course, userInput) {
     let canvasItems = await canvas.get(`/api/v1/courses/${course.id}/${userInput.category}`);
     console.log(`Got ${userInput.category} for ${course.name}`);
-    // console.log('Canvas Items: ', Object.values(canvasItems.join(' ')));
     return canvasItems;
 }
 
-let counter = 0;
-async function fixCanvasItems(course, canvasItems, userInput) {
-    console.log(`Fixing ${userInput.category}`);
-    // fs.writeFileSync(`./theThingWeNeed_${counter++}.json`, JSON.stringify(canvasItems, null, 4));//***********************************************
-    // find the old url
-    let found = canvasItems.filter(canvasItem => {
-        let objValues = Object.values(canvasItem);
-        // console.log(objValues);
-        let objString = objValues.join(' ');
-        // console.log(chalk.blue(objString));
-        var urlExists = objValues.find((objValue) => {
-            // console.log(objValue);
-            if (typeof objValue === 'object') {
-                try {return userInput.locateUrl.includes(objValue.url);}
-                catch (e) {return false;}
-                return false;
-            }
-
-        });
-        return urlExists;
-    });
-
-    // console.log(`found: ${found}`);
-    console.log('Found length: ', found.length);
-    if (found.length === 0) {
-        console.log('No matches found. Moving to the next course...\n');
-        return;
-    }
-
-    // catch the errors
-    let messages = [];
-    if (found.length > 1) {
-        messages.push(`More than one ${userInput.locateUrl} found`);
-        console.error(`More than one ${userInput.locateUrl} found`);
-    }
-
-    // get the logs for the csv
-    let canvasItemLogs = found.map(async foundItem => {
-        // determine the title based on the canvasItem type
-        let title = '';
-        if (foundItem.title !== undefined) {
-            title = foundItem.title;
-        } else if (foundItem.name !== undefined) {
-            title = foundItem.name;
-        } else if (foundItem.display_name !== undefined) {
-            title = foundItem.display_name;
-        } else if (foundItem.question_name !== undefined) {
-            title = foundItem.question_name;
+/*************************************************************************
+ * Search the given canvas item to see if it has a matching url. 
+ * If so, return that object. else return false.
+ * @param {object} course here only to match signature of fixCanvasItems
+ * @param {object} canvasItem the specific canvas item to search through
+ * @param {object} userInput the variables that the user selected
+ *************************************************************************/
+function findUrlMatch (course, canvasItem, userInput) {
+    // Core Logic
+    var itemFound = Object.values(canvasItem).find((objValue) => {
+        if (typeof objValue === 'object' && objValue !== null && objValue.url !== undefined) {
+            return userInput.locateUrl.includes(objValue.url); 
         }
-
-        // return the log for the csv
-        console.log('I AM READY TO RETURN. BEAM ME UP SCOTTY!');
-        return Promise.resolve({
-            'Term': course.term.name,
-            'Course Name': course.name,
-            'Course ID': course.id,
-            'Type': userInput.category,
-            'Item Title': title,
-            'Link Searched For': userInput.locateUrl,
-            'Messages': JSON.stringify(messages)
-        });
     });
-
-    return Promise.all(canvasItemLogs);
+    itemFound = itemFound ? itemFound : [];
+    // Console loggy stuff
+    if (itemFound.length === 0) console.log(`No matches found. Moving to the next ${userInput.category.slice(0, -1)}...`);
+    else if (itemFound.length > 1) console.log(`More than one ${userInput.locateUrl} found`);
+    // Stuff we care about
+    if (itemFound.length === 0) return false;
+    else if (itemFound.length > 1) itemFound.messages = itemFound.messages.push(`More than one ${userInput.locateUrl} found`);
+    return itemFound;
 }
 
+/*************************************************************************
+ * Creates the object that the d3-csv will format.
+ * It is crated based on information gathered from:
+ * course, canvasItems, and user input
+ *************************************************************************/
+function createCanvasItemLog(term, courseName, courseId, type, itemTitle, link, messages) {
+    return {
+        'Term': term,
+        'Course Name': courseName,
+        'Course ID': courseId,
+        'Type': type,
+        'Item Title': itemTitle,
+        'Link Searched For': link,
+        'Messages': JSON.stringify(messages)
+    };
+}
+
+/*************************************************************************
+ * Words
+ * @param {object} course
+ * @param {object} canvasItems
+ * @param {object} userInput
+ *************************************************************************/
+function fixCanvasItems(course, canvasItems, userInput) {
+    console.log(`Fixing ${userInput.category}`);
+    var matchesFound = canvasItems.filter(canvasItem => findUrlMatch(course, canvasItem, userInput));
+    console.log(); // new line for formatting
+    if (!matchesFound) return [];
+    let possibleTitleNames = ['title', 'name', 'display_name', 'question_name'];
+    let title = matchesFound.map( matchFound => possibleTitleNames.find(possibleTitleName => matchFound[possibleTitleName] !== undefined) );
+    var canvasItemLog = matchesFound.map(matchFound => createCanvasItemLog(course.term.name, course.name, course.id, userInput.category, title, userInput.link, matchFound.messages));
+    return canvasItemLog;
+}
+
+/*************************************************************************
+ * Words
+ * @param {object} userInput 
+ *************************************************************************/
 async function getAllCourses(userInput) {
     // get all courses from the Master Courses subaccount (i.e. 42)
-    let courses = await canvas.get(`/api/v1/accounts/${userInput.subaccount}/courses?include[]=subaccount&include[]=term`, {
+    var canvasGetRequestOptions = {
         sort: 'course_name',
-        'include': [
-            'subaccount',
-            'term'
-        ],
+        'include[]': 'subaccount',
         // search_term: 'seth childers'
-    });
-    
+    };
+    let courses = await canvas.get(`/api/v1/accounts/${userInput.subaccount}/courses?include[]=subaccount&include[]=term`, canvasGetRequestOptions);
     // sort them alphabetically so I know where in the list the tool is at when running
     courses.sort((a, b) => {
         if (a.course_code > b.course_code) return 1;
         else if (a.course_code < b.course_code) return -1;
         else return 0;
     });
-    
     // although we got everything under the specified account, not
     // everything necessarily belongs to it since there are nested subaccounts
     if (userInput.includeNestedAccounts === true) {
@@ -104,31 +101,23 @@ async function getAllCourses(userInput) {
     }
     // if the user specified a specific term, filter through and only include those in that term
     if (userInput.term !== 'All Terms') {
-        // fs.writeFileSync('./theThingWeNeed.json', JSON.stringify(courses, null, 4)); // ******************************************************************************
         courses = courses.filter(course => course.term.name.includes(userInput.term));
     }
+    console.log(`\nYou have found ${courses.length} courses!\n`);
     return courses;
 }
 
+/*************************************************************************
+ * Words
+ * @param {object} userInput object including domain, subaccount, includeNestedAccounts, 
+ *************************************************************************/
 async function main(userInput) {
-    // get all the courses
-    let courses = await getAllCourses(userInput);
-    console.log(`\nYou are about to process/check ${courses.length} courses!\n`);
-    // get the assignments for each course
     let logs = [];
-    for (let i = 0; i < courses.length; i++) {
-        try {
-            let canvasItems = await getCanvasItems(courses[i], userInput);
-            if (canvasItems && canvasItems.length !== 0) {
-                await fixCanvasItems(courses[i], canvasItems, userInput)
-                    .then((itemsToLog) => { if (itemsToLog && itemsToLog.length !== 0) logs.push(...itemsToLog); }); // changed to push rather than concat. solved some problems but might need some tweaking on larger datasets
-            }
-        } catch (err) {
-            console.error(err);
-        }
-    }
+    let courses = await getAllCourses(userInput); // get all the courses
+    var allMatchesInCourses;
+    await Promise.all( courses.map(async course => fixCanvasItems( course, await getCanvasItems(course, userInput), userInput )) ).then((allMatches) => allMatchesInCourses = allMatches ); // search the category for each course
+    logs.concat(...allMatchesInCourses);
     console.log('LOGS: ', logs);
-
     console.log('Formating csv');
     /* Format and create the CSV file with the log data */
     const csvData = d3.csvFormat(logs, [
@@ -141,12 +130,10 @@ async function main(userInput) {
         'Messages'
     ]);
     console.log(csvData);
-
     // if the specified path doesn't exist, make it
     if (!fs.existsSync(path.resolve(userInput.saveDirectory))) {
         fs.mkdirSync(path.resolve(userInput.saveDirectory));
     }
-
     // write it all to a file
     console.log('Writing File');
     fs.writeFileSync(path.resolve(userInput.saveDirectory, 'changeLog.csv'), csvData);
