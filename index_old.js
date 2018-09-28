@@ -19,6 +19,8 @@ async function fixCanvasItems(course, canvasItems, userInput) {
     // fs.writeFileSync(`./theThingWeNeed_${counter++}.json`, JSON.stringify(canvasItems, null, 4));//***********************************************
     // find the old url
     let found = canvasItems.filter(canvasItem => {
+        counter ++;
+        // if (counter === 10) fs.writeFileSync('./theThingWeNeed_O.json', JSON.stringify(Object.values(canvasItem), null, 4)); //***********************************************
         let objValues = Object.values(canvasItem);
         // console.log(objValues);
         let objString = objValues.join(' ');
@@ -34,6 +36,7 @@ async function fixCanvasItems(course, canvasItems, userInput) {
         });
         return urlExists;
     });
+    console.log(found);
 
     // console.log(`found: ${found}`);
     console.log('Found length: ', found.length);
@@ -62,6 +65,7 @@ async function fixCanvasItems(course, canvasItems, userInput) {
         } else if (foundItem.question_name !== undefined) {
             title = foundItem.question_name;
         }
+        console.log('Title is',title);
 
         // return the log for the csv
         // console.log('I AM READY TO RETURN. BEAM ME UP SCOTTY!');
@@ -87,7 +91,7 @@ async function getAllCourses(userInput) {
             'subaccount',
             'term'
         ],
-        // search_term: 'seth childers'
+        search_term: 'seth childers'
     });
     
     // sort them alphabetically so I know where in the list the tool is at when running

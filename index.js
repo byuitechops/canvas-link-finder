@@ -55,20 +55,21 @@ async function getCanvasItems(course, userInput) {
  * @param {object} canvasItem the specific canvas item to search through
  * @param {object} userInput the variables that the user selected
  *************************************************************************/
-function findUrlMatch (course, canvasItem, userInput) {
+function findUrlMatch (course, canvasItem, userInput, messages) {
     // Core Logic
     var itemFound = Object.values(canvasItem).find((objValue) => {
-        if (typeof objValue === 'object' && objValue !== null && objValue.url !== undefined) {
+        if (typeof objValue === 'object' && objValue !== null && objValue.url !== undefined) 
             return userInput.locateUrl.includes(objValue.url); 
-        }
     });
     itemFound = itemFound ? itemFound : [];
     // Console loggy stuff
     if (itemFound.length === 0) console.log(`No matches found. Moving to the next ${userInput.category.slice(0, -1)}...`);
     else if (itemFound.length > 1) console.log(`More than one ${userInput.locateUrl} found`);
+    else console.log('found one!');
+    //TODO we might need to move some things
     // Stuff we care about
     if (itemFound.length === 0) return false;
-    else if (itemFound.length > 1) itemFound.messages = itemFound.messages.push(`More than one ${userInput.locateUrl} found`);
+    else if (itemFound.length > 1) messages.push(`More than one ${userInput.locateUrl} found`);
     return itemFound;
 }
 
@@ -97,12 +98,13 @@ function createCanvasItemLog(term, courseName, courseId, type, itemTitle, link, 
  *************************************************************************/
 function fixCanvasItems(course, canvasItems, userInput) {
     console.log(`Fixing ${userInput.category}`);
-    var matchesFound = canvasItems.filter(canvasItem => findUrlMatch(course, canvasItem, userInput));
+    var messages = [];
+    var matchesFound = canvasItems.filter(canvasItem => findUrlMatch(course, canvasItem, userInput, messages));
     console.log(); // new line for formatting
-    if (!matchesFound) return [];
+    if (!matchesFound  || matchesFound === 0) return [];
     let possibleTitleNames = ['title', 'name', 'display_name', 'question_name'];
-    let title = matchFound => possibleTitleNames.find(possibleTitleName => matchFound[possibleTitleName] !== undefined);
-    var canvasItemLog = matchesFound.map(matchFound => createCanvasItemLog(course.term.name, course.name, course.id, userInput.category, title(matchFound), userInput.link, matchFound.messages));
+    let title = matchFound => possibleTitleNames.reduce((acc, possibleTitleName) => acc = matchFound[possibleTitleName] !== undefined ? matchFound[possibleTitleName] : acc, '');
+    var canvasItemLog = matchesFound.map(matchFound => createCanvasItemLog(course.term.name, course.name, course.id, userInput.category, title(matchFound), userInput.locateUrl, messages));
     return canvasItemLog;
 }
 
@@ -117,7 +119,7 @@ async function main(userInput) {
     let courses = await getAllCourses(userInput); // get all the courses
     var allMatchesInCourses;
     await Promise.all( courses.map(async course => fixCanvasItems( course, await getCanvasItems(course, userInput), userInput )) ).then((allMatches) => allMatchesInCourses = allMatches ); // search the category for each course
-    logs.concat(...allMatchesInCourses);
+    logs = logs.concat(...allMatchesInCourses);
     console.log('LOGS: ', logs);
     console.log('Formating csv');
     /* Format and create the CSV file with the log data */
