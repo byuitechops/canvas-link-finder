@@ -14,7 +14,7 @@ async function getAllCourses(userInput) {
     var canvasGetRequestOptions = {
         sort: 'course_name',
         'include[]': 'subaccount',
-        search_term: 'seth childers'
+        // search_term: 'seth childers'
     };
     let courses = await canvas.get(`/api/v1/accounts/${userInput.subaccount}/courses?include[]=subaccount&include[]=term`, canvasGetRequestOptions);
     // sort them alphabetically so I know where in the list the tool is at when running
