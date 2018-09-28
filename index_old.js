@@ -64,7 +64,7 @@ async function fixCanvasItems(course, canvasItems, userInput) {
         }
 
         // return the log for the csv
-        console.log('I AM READY TO RETURN. BEAM ME UP SCOTTY!');
+        // console.log('I AM READY TO RETURN. BEAM ME UP SCOTTY!');
         return Promise.resolve({
             'Term': course.term.name,
             'Course Name': course.name,

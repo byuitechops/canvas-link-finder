@@ -5,6 +5,36 @@ const fs = require('fs');
 const path = require('path');
 const chalk = require('chalk');
 
+/*************************************************************************
+ * Gets a JSON of all the courses in the given subaccount
+ * @param {object} userInput 
+ *************************************************************************/
+async function getAllCourses(userInput) {
+    // get all courses from the Master Courses subaccount (i.e. 42)
+    var canvasGetRequestOptions = {
+        sort: 'course_name',
+        'include[]': 'subaccount',
+        search_term: 'seth childers'
+    };
+    let courses = await canvas.get(`/api/v1/accounts/${userInput.subaccount}/courses?include[]=subaccount&include[]=term`, canvasGetRequestOptions);
+    // sort them alphabetically so I know where in the list the tool is at when running
+    courses.sort((a, b) => {
+        if (a.course_code > b.course_code) return 1;
+        else if (a.course_code < b.course_code) return -1;
+        else return 0;
+    });
+    // although we got everything under the specified account, not
+    // everything necessarily belongs to it since there are nested subaccounts
+    if (userInput.includeNestedAccounts === true) {
+        courses = courses.filter(course => course.account_id === userInput.subaccount);
+    }
+    // if the user specified a specific term, filter through and only include those in that term
+    if (userInput.term !== 'All Terms') {
+        courses = courses.filter(course => course.term.name.includes(userInput.term));
+    }
+    console.log(`\nYou have found ${courses.length} courses!\n`);
+    return courses;
+}
 
 /*************************************************************************
  * makes a get request to canvas to get all of the data in the given topic
@@ -71,41 +101,12 @@ function fixCanvasItems(course, canvasItems, userInput) {
     console.log(); // new line for formatting
     if (!matchesFound) return [];
     let possibleTitleNames = ['title', 'name', 'display_name', 'question_name'];
-    let title = matchesFound.map( matchFound => possibleTitleNames.find(possibleTitleName => matchFound[possibleTitleName] !== undefined) );
-    var canvasItemLog = matchesFound.map(matchFound => createCanvasItemLog(course.term.name, course.name, course.id, userInput.category, title, userInput.link, matchFound.messages));
+    let title = matchFound => possibleTitleNames.find(possibleTitleName => matchFound[possibleTitleName] !== undefined);
+    var canvasItemLog = matchesFound.map(matchFound => createCanvasItemLog(course.term.name, course.name, course.id, userInput.category, title(matchFound), userInput.link, matchFound.messages));
     return canvasItemLog;
 }
 
-/*************************************************************************
- * Words
- * @param {object} userInput 
- *************************************************************************/
-async function getAllCourses(userInput) {
-    // get all courses from the Master Courses subaccount (i.e. 42)
-    var canvasGetRequestOptions = {
-        sort: 'course_name',
-        'include[]': 'subaccount',
-        // search_term: 'seth childers'
-    };
-    let courses = await canvas.get(`/api/v1/accounts/${userInput.subaccount}/courses?include[]=subaccount&include[]=term`, canvasGetRequestOptions);
-    // sort them alphabetically so I know where in the list the tool is at when running
-    courses.sort((a, b) => {
-        if (a.course_code > b.course_code) return 1;
-        else if (a.course_code < b.course_code) return -1;
-        else return 0;
-    });
-    // although we got everything under the specified account, not
-    // everything necessarily belongs to it since there are nested subaccounts
-    if (userInput.includeNestedAccounts === true) {
-        courses = courses.filter(course => course.account_id === userInput.subaccount);
-    }
-    // if the user specified a specific term, filter through and only include those in that term
-    if (userInput.term !== 'All Terms') {
-        courses = courses.filter(course => course.term.name.includes(userInput.term));
-    }
-    console.log(`\nYou have found ${courses.length} courses!\n`);
-    return courses;
-}
+
 
 /*************************************************************************
  * Words

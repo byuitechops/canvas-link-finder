@@ -1,5 +1,5 @@
 var prompt = require('prompt');
-var linkReplace = require('./index.js');
+var linkReplace = require('./index_old.js');
 
 /**
  * The function with all the prompt inputs and validation
