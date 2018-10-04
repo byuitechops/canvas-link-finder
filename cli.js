@@ -35,14 +35,6 @@ function getInput() {
                     required: true,
                     default: './reports'
                 },
-                category: {
-                    type: 'string',
-                    description: 'What Canvas item category would you like to look through? <assignments|discussions|files|modules|moduleItems|pages|quizzes|quizQuestions>',
-                    pattern: /assignments|discussions|files|modules|moduleItems|pages|quizzes|quizQuestions/,
-                    message: '<assignments|discussions|files|modules|moduleItems|pages|quizzes|quizQuestions>',
-                    require: true,
-                    default: 'assignments'
-                },
                 locateUrl: {
                     type: 'string',
                     description: 'What is the url you are looking for?',
@@ -61,9 +53,7 @@ function getInput() {
         };
 
         prompt.message = '';
-
         prompt.start();
-
         prompt.get(schema, (err, userInput) => {
             if (err) {
                 console.error(err);
