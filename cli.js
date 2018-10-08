@@ -44,7 +44,7 @@ function getInput() {
                     type: 'string',
                     description: 'What is the url you are looking for?',
                     require: true,
-                    default: 'https://byui-canvas.mapleta.com:443/byui-canvas/lti/'
+                    default: 'external_tools/sessionless'
                 },
                 term: {
                     type: 'string',
