@@ -23,6 +23,11 @@ function getInput() {
                     required: true,
                     default: '8'
                 },
+                searchTerm: {
+                    type: 'string',
+                    description: 'Enter a course id, name, code, sis id here to filter the results (optional)',
+                    required: false,
+                },
                 includeNestedAccounts: {
                     type: 'boolean',
                     description: 'Would you like to run it on all the accounts under that number?',

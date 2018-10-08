@@ -6,16 +6,22 @@ const path = require('path');
 const flatten = require('flat');
 
 /*************************************************************************
- * Gets a JSON of all the courses in the given subaccount
+ * Gets the canvas JSON objects for each course in a specified subaccount
  * @param {object} userInput 
+ * @returns {object[]} An array of all the course objects
  *************************************************************************/
 async function getAllCourses(userInput) {
     // get all courses from the Master Courses subaccount (i.e. 42)
     let canvasGetRequestOptions = {
         sort: 'course_name',
         'include[]': 'subaccount',
-        search_term: 'seth childers'
     };
+
+    // add the search term if one was provided by the user
+    if (userInput.searchTerm) {
+        canvasGetRequestOptions.search_term = userInput.searchTerm; 
+    }
+
     let courses = await canvas.get(`/api/v1/accounts/${userInput.subaccount}/courses?include[]=subaccount&include[]=term`, canvasGetRequestOptions);
     // sort them alphabetically so I know where in the list the tool is at when running
     courses.sort((a, b) => {
@@ -37,9 +43,9 @@ async function getAllCourses(userInput) {
 }
 
 /*************************************************************************
- * makes a get request to canvas to get all of the data in the given topic
- * for the given course
- * @param {object} course the specific course object to look at
+ * Gets all the JSON canvas items to look through
+ * @param {object} course The specific course object to look at
+ * @returns {object[]} An array of all the canvas items to look through
  *************************************************************************/
 async function getCanvasItems(course) {
     // Build the canvas-api-wrapper course and get all the needed items
@@ -58,13 +64,16 @@ async function getCanvasItems(course) {
     return items;
 }
 
-/*************************************************************************
+/** *************************************************************
  * Creates the object that the d3-csv will format.
  * It is crated based on information gathered from:
  * course, canvasItems, and user input
- *************************************************************************/
+ * @param {object} course 
+ * @param {object} userInput 
+ * @param {object} matchFound
+ * @returns {object} A log item that will go into the csv report 
+ * **************************************************************/
 function createCanvasItemLog(course, userInput, matchFound) {
-    console.log('logging: ', matchFound)
     return {
         'Course Term': course.term.name,
         'Course Code': course.course_code,
@@ -80,12 +89,13 @@ function createCanvasItemLog(course, userInput, matchFound) {
     };
 }
 
-/*************************************************************************
+/** ***********************************************************************************
  * Search the given canvas item to see if it has a matching url. 
  * If so, return that object. else return false.
  * @param {object} canvasItem the specific canvas item to search through
  * @param {object} userInput the letiables that the user selected
- *************************************************************************/
+ * @returns {object[]} An array of all the canvas items that had the searched-for url
+ * ************************************************************************************/
 function findUrlMatch (canvasItem, userInput) {
     let message = null;
     let flattenedItem = flatten(canvasItem); // make the canvasItem object a flat object
@@ -106,19 +116,14 @@ function findUrlMatch (canvasItem, userInput) {
         return acc;
     }, []);
 
-    console.log('itemsFound: ', itemsFound)
-
+    // print out a message, depending on how many instances of the search phrase were found
     if (itemsFound === undefined) {
-        message = '';
-        console.log(`No matches found. Moving to the next ${canvasItem.constructor.name}...\n`);
         return;
     } else if (itemsFound.length > 1) {
         message = `${itemsFound.length} instances of ${userInput.locateUrl} found on this Canvas Item\n`;
-        console.log(message);
-    } else {
-        console.log('found one!\n');
     }
 
+    // create the return object with more information
     itemsFound = itemsFound.map(itemFound => {
         return {
             itemFound,
@@ -129,14 +134,16 @@ function findUrlMatch (canvasItem, userInput) {
     return itemsFound;
 }
 
-/*************************************************************************
- * Words
+/** **********************************************************************************
+ * Check each course to see if the searched for url is found within it,
+ * then return information on the items to log that will go into the csv 
  * @param {object} course
  * @param {object} canvasItems
  * @param {object} userInput
- *************************************************************************/
-function findMatches(course, canvasItems, userInput) {
-    console.log(`Fixing ${course.name}`);
+ * @returns {object[]} An array of logs for a course that will go into the csv report
+ * ***********************************************************************************/
+function checkCourse(course, canvasItems, userInput) {
+    console.log(`Searching through ${course.name}`);
     let matchesFound = canvasItems.reduce((acc, canvasItem) => {
         let itemsFound = findUrlMatch(canvasItem, userInput);
         if (itemsFound !== undefined) {
@@ -145,15 +152,15 @@ function findMatches(course, canvasItems, userInput) {
         return acc;
     }, []);
     if (matchesFound.length === 0) return [];
-    let canvasItemLog = matchesFound.map(matchFound => createCanvasItemLog(course, userInput, matchFound));
-    return canvasItemLog;
+    let canvasItemLogs = matchesFound.map(matchFound => createCanvasItemLog(course, userInput, matchFound));
+    return canvasItemLogs;
 }
 
-/*************************************************************************
+/** ***********************************************************************
  * Get all the user-specified courses, then find where the search url is found
  * within each course and stick that information into a CSV for further analysis
  * @param {object} userInput object including all user input from cli.js
- *************************************************************************/
+ * ************************************************************************/
 async function main(userInput) {
     let logs = [];
     const courses = await getAllCourses(userInput); // get the courses
@@ -163,7 +170,7 @@ async function main(userInput) {
         - for each canvas item search it's canvas JSON object for the matched search url
         - stick the canvas item's information into a log if it had the search url somewhere
         - return all the log objects and assign them to the 'logs' array */
-    await Promise.all(courses.map(async course => findMatches(course, await getCanvasItems(course), userInput))).then((allMatches) => logs = logs.concat(...allMatches));
+    await Promise.all(courses.map(async course => checkCourse(course, await getCanvasItems(course), userInput))).then((allMatches) => logs = logs.concat(...allMatches));
     
     // Format and create the CSV file with the log data
     const csvData = d3.csvFormat(logs, [
