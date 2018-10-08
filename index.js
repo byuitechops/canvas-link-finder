@@ -3,7 +3,7 @@ const canvas = require('canvas-api-wrapper');
 const d3 = require('d3-dsv');
 const fs = require('fs');
 const path = require('path');
-const chalk = require('chalk');
+const flatten = require('flat');
 
 /*************************************************************************
  * Gets a JSON of all the courses in the given subaccount
@@ -14,6 +14,7 @@ async function getAllCourses(userInput) {
     let canvasGetRequestOptions = {
         sort: 'course_name',
         'include[]': 'subaccount',
+        search_term: 'seth childers'
     };
     let courses = await canvas.get(`/api/v1/accounts/${userInput.subaccount}/courses?include[]=subaccount&include[]=term`, canvasGetRequestOptions);
     // sort them alphabetically so I know where in the list the tool is at when running
@@ -62,17 +63,20 @@ async function getCanvasItems(course) {
  * It is crated based on information gathered from:
  * course, canvasItems, and user input
  *************************************************************************/
-function createCanvasItemLog(course, userInput, matchFound, messages) {
+function createCanvasItemLog(course, userInput, matchFound) {
+    console.log('logging: ', matchFound)
     return {
         'Course Term': course.term.name,
         'Course Code': course.course_code,
         'Course Name': course.name,
         'Course ID': course.id,
-        'Canvas Item Type': matchFound.constructor.name,
-        'Canvas Item Title': matchFound.getTitle(),
-        'Canvas Item ID': matchFound.getId(),
+        'Canvas Item Type': matchFound.canvasItem.constructor.name,
+        'Canvas Item Title': matchFound.canvasItem.getTitle(),
+        'Canvas Item ID': matchFound.canvasItem.getId(),
+        'Canvas Item Internal Link': matchFound.canvasItem.html_url, // ? matchFound.canvasItem.html_url : 'null',
+        'Canvas Item External Link': matchFound.itemFound.objValue, // ? matchFound.itemFound.objValue : 'null',
         'Link Searched For': userInput.locateUrl,
-        'Messages': JSON.stringify(messages)
+        'Messages': JSON.stringify(matchFound.message)
     };
 }
 
@@ -83,20 +87,45 @@ function createCanvasItemLog(course, userInput, matchFound, messages) {
  * @param {object} userInput the letiables that the user selected
  *************************************************************************/
 function findUrlMatch (canvasItem, userInput) {
-    let messages = [];
+    let message = null;
+    let flattenedItem = flatten(canvasItem); // make the canvasItem object a flat object
+
     /* Check if the searched for url is in the canvasItem object, or if 
        any of the urls in the canvasItem object are in the searched for url */
-    let itemsFound = Object.values(canvasItem).filter((objValue) => objValue && (objValue.toString().includes(userInput.locateUrl) || userInput.locateUrl.includes(objValue)));
-    
-    if (itemsFound.length === 0) {
+    let objKeys = Object.keys(flattenedItem);
+    let objValues = Object.values(flattenedItem);
+
+    // check if the canvasItem flattened object has the search phrase in it
+    let itemsFound = objValues.reduce((acc, objValue, i) => {
+        if (objValue && objValue.toString().includes(userInput.locateUrl)) {
+            return acc.concat({
+                objKey: objKeys[i],
+                objValue
+            });
+        }
+        return acc;
+    }, []);
+
+    console.log('itemsFound: ', itemsFound)
+
+    if (itemsFound === undefined) {
+        message = '';
         console.log(`No matches found. Moving to the next ${canvasItem.constructor.name}...\n`);
         return;
     } else if (itemsFound.length > 1) {
-        console.log(`${itemsFound.length} instances of ${userInput.locateUrl} found on this Canvas Item\n`);
-        messages.push(`${itemsFound.length} instances of ${userInput.locateUrl} found on this Canvas Item\n`);
+        message = `${itemsFound.length} instances of ${userInput.locateUrl} found on this Canvas Item\n`;
+        console.log(message);
     } else {
         console.log('found one!\n');
     }
+
+    itemsFound = itemsFound.map(itemFound => {
+        return {
+            itemFound,
+            message,
+            canvasItem
+        };
+    });
     return itemsFound;
 }
 
@@ -108,10 +137,15 @@ function findUrlMatch (canvasItem, userInput) {
  *************************************************************************/
 function findMatches(course, canvasItems, userInput) {
     console.log(`Fixing ${course.name}`);
-    let messages = [];
-    let matchesFound = canvasItems.filter(canvasItem => findUrlMatch(canvasItem, userInput, messages));
+    let matchesFound = canvasItems.reduce((acc, canvasItem) => {
+        let itemsFound = findUrlMatch(canvasItem, userInput);
+        if (itemsFound !== undefined) {
+            return acc.concat(...itemsFound);
+        }
+        return acc;
+    }, []);
     if (matchesFound.length === 0) return [];
-    let canvasItemLog = matchesFound.map(matchFound => createCanvasItemLog(course, userInput, matchFound, messages));
+    let canvasItemLog = matchesFound.map(matchFound => createCanvasItemLog(course, userInput, matchFound));
     return canvasItemLog;
 }
 
@@ -122,16 +156,14 @@ function findMatches(course, canvasItems, userInput) {
  *************************************************************************/
 async function main(userInput) {
     let logs = [];
-    let courses = await getAllCourses(userInput); // get the courses
+    const courses = await getAllCourses(userInput); // get the courses
 
     /* For each course:
         - get it's canvas items and put them in a flat array of all canvas items
         - for each canvas item search it's canvas JSON object for the matched search url
         - stick the canvas item's information into a log if it had the search url somewhere
-        - return all the log objects and assign them to the 'logs' array
-    */
+        - return all the log objects and assign them to the 'logs' array */
     await Promise.all(courses.map(async course => findMatches(course, await getCanvasItems(course), userInput))).then((allMatches) => logs = logs.concat(...allMatches));
-    console.log('LOGS: ', logs);
     
     // Format and create the CSV file with the log data
     const csvData = d3.csvFormat(logs, [
@@ -142,6 +174,8 @@ async function main(userInput) {
         'Canvas Item Type',
         'Canvas Item Title',
         'Canvas Item ID',
+        'Canvas Item Internal Link',
+        'Canvas Item External Link',
         'Link Searched For',
         'Messages'
     ]);
