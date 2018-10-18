@@ -33,17 +33,23 @@ async function getAllCourses(userInput) {
     // everything necessarily belongs to it since there are nested subaccounts
     if (userInput.includeNestedAccounts === true) {
         courses = courses.filter(course => course.account_id === userInput.subaccount);
+        // Make sure courses isn't undefined after the filter
+        courses = courses ? courses : []; 
     }
-    // Make sure courses isn't undefined after the filter
-    courses = courses ? courses : []; 
     // if the user specified a specific term, filter through and only include those in that term
     if (userInput.term !== 'All Terms') {
         courses = courses.filter(course => course.term.name.includes(userInput.term));
+        // Make sure courses isn't undefined after the filter
+        courses = courses ? courses : []; 
     }
-    // Make sure courses isn't undefined after the filter
-    courses = courses ? courses : []; 
     // Make stand-alone copies of the keys we want, to free up memory
-    courses = courses.map( (course) => Object.assign({course_code: null, name: null, id: null, term: {name: null}, account_id: null}, {course_code: course.course_code}, {name: course.name}, {id: course.id}, {term: {name: course.term.name}}, {account_id: course.account_id}) );
+    courses = courses.map( (course) => Object.assign({}, 
+        {course_code: course.course_code, 
+            name: course.name, 
+            id: course.id, 
+            term: {name: course.term.name}, 
+            account_id: 
+            course.account_id}) );
 
     console.log(`\nYou have found ${courses.length} courses!\n`);
     return courses;
