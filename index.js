@@ -34,10 +34,17 @@ async function getAllCourses(userInput) {
     if (userInput.includeNestedAccounts === true) {
         courses = courses.filter(course => course.account_id === userInput.subaccount);
     }
+    // Make sure courses isn't undefined after the filter
+    courses = courses ? courses : []; 
     // if the user specified a specific term, filter through and only include those in that term
     if (userInput.term !== 'All Terms') {
         courses = courses.filter(course => course.term.name.includes(userInput.term));
     }
+    // Make sure courses isn't undefined after the filter
+    courses = courses ? courses : []; 
+    // Make stand-alone copies of the keys we want, to free up memory
+    courses = courses.map( (course) => Object.assign({course_code: null, name: null, id: null, term: {name: null}, account_id: null}, {course_code: course.course_code}, {name: course.name}, {id: course.id}, {term: {name: course.term.name}}, {account_id: course.account_id}) );
+
     console.log(`\nYou have found ${courses.length} courses!\n`);
     return courses;
 }
@@ -53,11 +60,11 @@ async function getCanvasItems(course) {
     
     // Put all of the items into a single array
     let items = [];
-    items = items.concat(...(await canvasCourse['assignments'].get({ 'include[]': "external_tool_tag_attributes"})));
-    items = items.concat(...(await canvasCourse['pages'].getComplete()));
-    items = items.concat(...(await canvasCourse['quizzes'].getComplete()));
-    items = items.concat(...(await canvasCourse['modules'].getComplete()));
-    items = items.concat(...(await canvasCourse['discussions'].get()));
+    items = items.concat(...await canvasCourse['assignments'].get({ 'include[]': 'external_tool_tag_attributes'}));
+    items = items.concat(...await canvasCourse['pages'].getComplete());
+    items = items.concat(...await canvasCourse['quizzes'].getComplete());
+    items = items.concat(...await canvasCourse['modules'].getComplete());
+    items = items.concat(...await canvasCourse['discussions'].get());
     items = items.concat(canvasCourse.quizzes.getFlattened());
     items = items.concat(canvasCourse.modules.getFlattened());
 
@@ -74,19 +81,20 @@ async function getCanvasItems(course) {
  * @returns {object} A log item that will go into the csv report 
  * **************************************************************/
 function createCanvasItemLog(course, userInput, matchFound) {
-    return {
-        'Course Term': course.term.name,
-        'Course Code': course.course_code,
-        'Course Name': course.name,
-        'Course ID': course.id,
-        'Canvas Item Type': matchFound.canvasItem.constructor.name,
-        'Canvas Item Title': matchFound.canvasItem.getTitle(),
-        'Canvas Item ID': matchFound.canvasItem.getId(),
-        'Canvas Item Internal Link': matchFound.canvasItem.html_url, // ? matchFound.canvasItem.html_url : 'null',
-        'Canvas Item External Link': matchFound.itemFound.objValue, // ? matchFound.itemFound.objValue : 'null',
-        'Link Searched For': userInput.locateUrl,
-        'Messages': JSON.stringify(matchFound.message)
-    };
+    return Object.assign({},
+        {
+            'Course Term': course.term.name,
+            'Course Code': course.course_code,
+            'Course Name': course.name,
+            'Course ID': course.id,
+            'Canvas Item Type': matchFound.canvasItem.constructor.name,
+            'Canvas Item Title': matchFound.canvasItem.getTitle(),
+            'Canvas Item ID': matchFound.canvasItem.getId(),
+            'Canvas Item Internal Link': matchFound.canvasItem.html_url, // ? matchFound.canvasItem.html_url : 'null',
+            'Canvas Item External Link': matchFound.itemFound.objValue, // ? matchFound.itemFound.objValue : 'null',
+            'Link Searched For': userInput.locateUrl,
+            'Messages': JSON.stringify(matchFound.message)
+        });
 }
 
 /** ***********************************************************************************
@@ -152,8 +160,7 @@ function checkCourse(course, canvasItems, userInput) {
         return acc;
     }, []);
     if (matchesFound.length === 0) return [];
-    let canvasItemLogs = matchesFound.map(matchFound => createCanvasItemLog(course, userInput, matchFound));
-    return canvasItemLogs;
+    return matchesFound.map(matchFound => createCanvasItemLog(course, userInput, matchFound));
 }
 
 /** ***********************************************************************
