@@ -42,15 +42,21 @@ async function getAllCourses(userInput) {
         // Make sure courses isn't undefined after the filter
         courses = courses ? courses : []; 
     }
-    // Make stand-alone copies of the keys we want, to free up memory
-    courses = courses.map( (course) => Object.assign({}, 
-        {course_code: course.course_code, 
-            name: course.name, 
-            id: course.id, 
-            term: {name: course.term.name}, 
-            account_id: 
-            course.account_id}) );
-
+    // Delete any keys that we dont want, to preemptively clear up memory.
+    courses = courses.map( (course) => {
+        let courseKeysToKeep = ['course_code', 'name', 'id', 'term', 'account_id'];
+        Object.keys(course).forEach( courseKey => {
+            let doKeepKey = courseKeysToKeep.some( keyToKeep => keyToKeep === courseKey);
+            if (!doKeepKey) delete course[courseKey];
+        } );
+        let termKeyToKeep = ['name'];
+        Object.keys(course.term).forEach( termKey => {
+            let doKeepKey = termKeyToKeep.some(keyToKeep => keyToKeep === termKey);
+            if (!doKeepKey) delete course.term[termKey];
+        });
+        return course;
+    });
+    console.log(courses[0]);
     console.log(`\nYou have found ${courses.length} courses!\n`);
     return courses;
 }
@@ -77,7 +83,7 @@ async function getCanvasItems(course) {
     return items;
 }
 
-/** *************************************************************
+/***************************************************************
  * Creates the object that the d3-csv will format.
  * It is crated based on information gathered from:
  * course, canvasItems, and user input
@@ -85,7 +91,7 @@ async function getCanvasItems(course) {
  * @param {object} userInput 
  * @param {object} matchFound
  * @returns {object} A log item that will go into the csv report 
- * **************************************************************/
+ ***************************************************************/
 function createCanvasItemLog(course, userInput, matchFound) {
     return Object.assign({},
         {
@@ -183,7 +189,7 @@ async function main(userInput) {
         - for each canvas item search it's canvas JSON object for the matched search url
         - stick the canvas item's information into a log if it had the search url somewhere
         - return all the log objects and assign them to the 'logs' array */
-    await Promise.all(courses.map(async course => checkCourse(course, await getCanvasItems(course), userInput))).then((allMatches) => logs = logs.concat(...allMatches));
+    await Promise.all(courses.map(async course => await checkCourse(course, await getCanvasItems(course), userInput))).then((allMatches) => logs = logs.concat(...allMatches));
     
     // Format and create the CSV file with the log data
     const csvData = d3.csvFormat(logs, [
