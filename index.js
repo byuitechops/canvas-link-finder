@@ -1,9 +1,9 @@
 /*eslint-env es6*/
-const canvas = require('canvas-api-wrapper');
 const d3 = require('d3-dsv');
 const fs = require('fs');
 const path = require('path');
-const flatten = require('flat');
+// const canvas = require('canvas-api-wrapper'); // Moved out of global scope
+// const flatten = require('flat'); // Moved out of global scope
 
 /*************************************************************************
  * Gets the canvas JSON objects for each course in a specified subaccount
@@ -11,6 +11,7 @@ const flatten = require('flat');
  * @returns {object[]} An array of all the course objects
  *************************************************************************/
 async function getAllCourses(userInput) {
+    const canvas = require('canvas-api-wrapper'); // Moved out of global scope
     // get all courses from the Master Courses subaccount (i.e. 42)
     let canvasGetRequestOptions = {
         sort: 'course_name',
@@ -67,6 +68,7 @@ async function getAllCourses(userInput) {
  * @returns {object[]} An array of all the canvas items to look through
  *************************************************************************/
 async function getCanvasItems(course) {
+    const canvas = require('canvas-api-wrapper'); // Moved out of global scope
     // Build the canvas-api-wrapper course and get all the needed items
     let canvasCourse = canvas.getCourse(course.id);
     
@@ -117,6 +119,7 @@ function createCanvasItemLog(course, userInput, matchFound) {
  * @returns {object[]} An array of all the canvas items that had the searched-for url
  * ************************************************************************************/
 function findUrlMatch (canvasItem, userInput) {
+    const flatten = require('flat'); // Moved into scope to release memory when done
     let message = null;
     let flattenedItem = flatten(canvasItem); // make the canvasItem object a flat object
 
