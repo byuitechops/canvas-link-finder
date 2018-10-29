@@ -2,8 +2,8 @@
 const d3 = require('d3-dsv');
 const fs = require('fs');
 const path = require('path');
-// const canvas = require('canvas-api-wrapper'); // Moved out of global scope
-// const flatten = require('flat'); // Moved out of global scope
+const canvas = require('canvas-api-wrapper'); // Moved out of global scope
+const flatten = require('flat'); // Moved out of global scope
 
 /*************************************************************************
  * Gets the canvas JSON objects for each course in a specified subaccount
@@ -11,7 +11,6 @@ const path = require('path');
  * @returns {object[]} An array of all the course objects
  *************************************************************************/
 async function getAllCourses(userInput) {
-    const canvas = require('canvas-api-wrapper'); // Moved out of global scope
     // get all courses from the Master Courses subaccount (i.e. 42)
     let canvasGetRequestOptions = {
         sort: 'course_name',
@@ -24,6 +23,7 @@ async function getAllCourses(userInput) {
     }
 
     let courses = await canvas.get(`/api/v1/accounts/${userInput.subaccount}/courses?include[]=subaccount&include[]=term`, canvasGetRequestOptions);
+    console.log(courses.length);
     // sort them alphabetically so I know where in the list the tool is at when running
     courses.sort((a, b) => {
         if (a.course_code > b.course_code) return 1;
@@ -45,19 +45,19 @@ async function getAllCourses(userInput) {
     }
     // Delete any keys that we dont want, to preemptively clear up memory.
     courses = courses.map( (course) => {
-        let courseKeysToKeep = ['course_code', 'name', 'id', 'term', 'account_id'];
+        let courseKeysToKeep = ['course_code', 'name', 'id', /* 'term', */ 'account_id'];
         Object.keys(course).forEach( courseKey => {
             let doKeepKey = courseKeysToKeep.some( keyToKeep => keyToKeep === courseKey);
             if (!doKeepKey) delete course[courseKey];
         } );
-        let termKeyToKeep = ['name'];
+        /* let termKeyToKeep = ['name'];
         Object.keys(course.term).forEach( termKey => {
             let doKeepKey = termKeyToKeep.some(keyToKeep => keyToKeep === termKey);
             if (!doKeepKey) delete course.term[termKey];
-        });
+        }); */
         return course;
     });
-    console.log(courses[0]);
+    // console.log(courses[0]);
     console.log(`\nYou have found ${courses.length} courses!\n`);
     return courses;
 }
@@ -68,7 +68,6 @@ async function getAllCourses(userInput) {
  * @returns {object[]} An array of all the canvas items to look through
  *************************************************************************/
 async function getCanvasItems(course) {
-    const canvas = require('canvas-api-wrapper'); // Moved out of global scope
     // Build the canvas-api-wrapper course and get all the needed items
     let canvasCourse = canvas.getCourse(course.id);
     
@@ -119,7 +118,6 @@ function createCanvasItemLog(course, userInput, matchFound) {
  * @returns {object[]} An array of all the canvas items that had the searched-for url
  * ************************************************************************************/
 function findUrlMatch (canvasItem, userInput) {
-    const flatten = require('flat'); // Moved into scope to release memory when done
     let message = null;
     let flattenedItem = flatten(canvasItem); // make the canvasItem object a flat object
 
@@ -165,8 +163,8 @@ function findUrlMatch (canvasItem, userInput) {
  * @param {object} userInput
  * @returns {object[]} An array of logs for a course that will go into the csv report
  * ***********************************************************************************/
-function checkCourse(course, canvasItems, userInput) {
-    console.log(`Searching through ${course.name}`);
+function checkCourse(course, canvasItems, userInput, courseIndex, courseCount) {
+    console.log(`${courseIndex.toString().padStart(5, '0')} / ${courseCount.toString().padStart(5, '0')} Searching through ${course.name}`);
     let matchesFound = canvasItems.reduce((acc, canvasItem) => {
         let itemsFound = findUrlMatch(canvasItem, userInput);
         if (itemsFound !== undefined) {
@@ -192,7 +190,7 @@ async function main(userInput) {
         - for each canvas item search it's canvas JSON object for the matched search url
         - stick the canvas item's information into a log if it had the search url somewhere
         - return all the log objects and assign them to the 'logs' array */
-    await Promise.all(courses.map(async course => await checkCourse(course, await getCanvasItems(course), userInput))).then((allMatches) => logs = logs.concat(...allMatches));
+    await Promise.all(await courses.map(async (course, courseIndex) => checkCourse(course, await getCanvasItems(course), userInput, courseIndex, courses.length))).then((allMatches) => logs = logs.concat(...allMatches)).catch((err) => {});
     
     // Format and create the CSV file with the log data
     const csvData = d3.csvFormat(logs, [
